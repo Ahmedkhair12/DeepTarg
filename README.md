@@ -1,2 +1,2 @@
 # DeepTarg
-My master's thesis project
+A Graph Neural Network Framework for Target Discovery
