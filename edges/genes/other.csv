@@ -1,0 +1,386 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "18b62fb7-60c6-4540-95eb-185b9b2e46a8",
+   "metadata": {
+    "tags": []
+   },
+   "source": [
+    "## Creating mapping-dictionaries and edge-index for modules in the heterogenous graph \n",
+    "In this part, we create edge indexes for modules in the heterogenous graph where different entities; genes, pathways (pw), molecular functions (mf) and biological processes (bp) will be mapped using mapping dictionaries where each entity will be assigned an integer value satrting from zero."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "a3bf43fc-f06b-46be-bd42-1a71c2b1865e",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import os\n",
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import json"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9d26fd3b-a132-4133-8fcf-a602bf951f27",
+   "metadata": {},
+   "source": [
+    "### (1) Genes \n",
+    "#### (I) Creating genes mapping dictionary:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "04945de3-0cbd-4bdf-aa1d-629cd966f626",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Load the gene_to_gene relationships file\n",
+    "genes = pd.read_csv(\"STRING.csv\")\n",
+    "genes[\"gene_from\"] = genes[\"gene_from\"].astype(\"int\")\n",
+    "genes[\"gene_to\"] = genes[\"gene_to\"].astype(\"int\")\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "deb95167-62e6-43b2-84a2-34efb1883b0b",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Create a gene-mapping dictionary and save it as a JSON file\n",
+    "unique_gene_ids = genes['gene_from'].sort_values().unique()\n",
+    "uniq_gene_ids = pd.Series(unique_gene_ids)\n",
+    "genes_dict = {value: key for key, value in uniq_gene_ids.to_dict().items()}\n",
+    "\n",
+    "file_path = './genes_dict.json'\n",
+    "with open(file_path, 'w') as json_file:\n",
+    "    json.dump(genes_dict, json_file)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "fa075813-9ff4-4c02-bd5f-9131704780a4",
+   "metadata": {},
+   "source": [
+    "#### (II) Creating genes edge-indexes:\n",
+    "The gene module of the heterogeneous graph contains eight different types of gene-to-gene relationships, each of which was stored in a separate file. Next, we iterate through the files, map the gene IDs using the gene_map dictionary, and save the edge index in the form [2 x num_edges]."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "76f79be5-bb55-4f26-87fc-fc3b6923c8dd",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# for multiple gene-gene relationship indexing\n",
+    "input_directory = './genes_subgraph/'\n",
+    "output_directory = './genes_subgraph/edge_index/'\n",
+    "\n",
+    "# Iterate over CSV files in the input directory\n",
+    "for filename in os.listdir(input_directory):\n",
+    "    if filename.endswith(\".csv\"):\n",
+    "        # Construct full file paths\n",
+    "        input_filepath = os.path.join(input_directory, filename)\n",
+    "        output_filename = f\"edge_index_{str(filename[0:-4])}\"\n",
+    "        output_filepath = os.path.join(output_directory, output_filename)\n",
+    "        genes = pd.read_csv(input_filepath)\n",
+    "        genes[\"gene_from\"] = genes[\"gene_from\"].map(genes_dict)\n",
+    "        genes[\"gene_to\"] = genes[\"gene_to\"].map(genes_dict)\n",
+    "        edge_index = genes[[\"gene_from\", \"gene_to\"]].values.transpose()\n",
+    "        np.save(output_filepath, edge_index)\n",
+    "        print(f\"{filename}\", edge_index.shape) # [2 x num_edges]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "88e40e46-53c8-4089-84cd-8dc470d2b2b2",
+   "metadata": {},
+   "source": [
+    "### (2) Perturbations\n",
+    "#### (I) Creating perturbation mapping-dictionaries:\n",
+    "For the perturbation module, two mapping dictionaries will be created. The first will be a mapping dictionary for perturbation IDs and their signatures. While the second dictionary will be the index mapping dictionary for the perturbation IDs."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "27e467fc-e2de-4705-bf7b-7678875d9a6d",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#Read the Cmap signature matrix\n",
+    "gen_perts = pd.read_csv('genperts_sigs_landmark.csv')\n",
+    "\n",
+    "# perturbation-signatures dictionary\n",
+    "genperts_sig_mapping_dict = dict(zip(gen_perts['sig_id'], gen_perts['pert_id']))\n",
+    "\n",
+    "# Relaplce signature-ids with perturbation-ids\n",
+    "sig['cid'] = sig['cid'].map(genperts_sig_mapping_dict)\n",
+    "perts_to_genes = gen_perts[['pert_id','gene_id']]\n",
+    "genperts_ser = pd.Series(sigs_order)\n",
+    "\n",
+    "# Perturbation indexing dictinary\n",
+    "genperts_dict = {value: key for key, value in genperts_ser.to_dict().items()}\n",
+    "\n",
+    "# save genperts_to_sig_dict as json file\n",
+    "file_path = '/home/ahmed_kh/project/graph/genes/edge_index/mapping_dicts/genperts_to_sig_dict.json'\n",
+    "with open(file_path, 'w') as json_file:\n",
+    "    json.dump(genperts_sig_mapping_dict, json_file)\n",
+    "    \n",
+    "# save genperts_index_dict as json file\n",
+    "file_path = '/home/ahmed_kh/project/graph/genes/edge_index/mapping_dicts/genperts_dict.json'\n",
+    "with open(file_path, 'w') as json_file:\n",
+    "    json.dump(genperts_dict, json_file)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "57bc93e6-495a-40c6-871a-85a60719dcd1",
+   "metadata": {},
+   "source": [
+    "#### (II) Creating perturbation-gene edge index:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "04c00fae-8c61-4b2b-ab88-3f8441ac305c",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Edge index mapping from gene_dict and genperts_dict\n",
+    "perts_to_genes[\"gene_id\"] = perts_to_genes[\"gene_id\"].map(genes_dict)\n",
+    "perts_to_genes[\"pert_id\"] = perts_to_genes[\"pert_id\"].map(genperts_dict)\n",
+    "\n",
+    "perts_to_genes = perts_to_genes.dropna()\n",
+    "perts_to_genes[\"gene_id\"] = perts_to_genes[\"gene_id\"].astype(int)\n",
+    "perts_to_genes[\"pert_id\"] = perts_to_genes[\"pert_id\"].astype(int)\n",
+    "edge_index = perts_to_genes[[\"pert_id\", \"gene_id\"]].values.transpose()\n",
+    "\n",
+    "# save genperts-gene edge index\n",
+    "np.save('/home/ahmed_kh/project/graph/genes/genperts_gene_edge_index.npy', edge_index)\n",
+    "print(\"Done\", edge_index.shape) # [2 x num_edges]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5d9b3fa2-28c8-4af9-8e6d-e6702222d216",
+   "metadata": {},
+   "source": [
+    "### (3) Pathways\n",
+    "#### (I) Creating pathways mapping-dictionary:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "15efd31f-2836-47af-8ae2-60ac70768927",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# read bp-gene edge file\n",
+    "pw = pd.read_csv(\"pw_gene.csv\")\n",
+    "\n",
+    "# uinque pw terms\n",
+    "unique_pw_ids = pw['pw'].sort_values().unique()\n",
+    "\n",
+    "# Convert the NumPy array to a Pandas Series\n",
+    "uniq_pw_ids = pd.Series(unique_pw_ids)\n",
+    "\n",
+    "# create pw_dict \n",
+    "pw_map_dict = {value: key for key, value in uniq_pw_ids.to_dict().items()}\n",
+    "# save pw_dict as json file\n",
+    "file_path = '/home/ahmed_kh/project/graph/genes/edge_index/mapping_dicts/pw_dict.json'\n",
+    "with open(file_path, 'w') as json_file:\n",
+    "    json.dump(pw_map_dict, json_file)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "31ac703c-1f02-44c0-a4bc-646bb749191b",
+   "metadata": {},
+   "source": [
+    "#### (II) Creating pathway-gene edge index:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "b3de34df-e322-463e-bc29-081ebd541406",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Edge index mapping from gene_dict and pw_dict\n",
+    "pw[\"gene\"] = pw[\"gene\"].map(genes_dict)\n",
+    "pw[\"pw\"] = pw[\"pw\"].map(pw_map_dict)\n",
+    "pw = pw.dropna()\n",
+    "pw[\"gene\"] = pw[\"gene\"].astype(int)\n",
+    "pw[\"pw\"] = pw[\"pw\"].astype(int)\n",
+    "edge_index = pw[[\"gene\", \"pw\"]].values.transpose()\n",
+    "\n",
+    "# save gene-pw edge index\n",
+    "np.save('/home/ahmed_kh/project/graph/genes/pw_gene_edge_index.npy', edge_index)\n",
+    "print(\"Done\", edge_index.shape) # [2 x num_edges]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "26e60343-7eda-4701-8efb-aeff8cc6917c",
+   "metadata": {
+    "tags": []
+   },
+   "source": [
+    "### (4) Molecular functions\n",
+    "#### (I) Creating MF mapping-dictionary:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "79cd733c-b763-4019-978b-8e8d1ac2b735",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# read mf-gene edge file\n",
+    "mf = pd.read_csv(\"/home/ahmed_kh/project/raw_databases/drkg/MF_gene.csv\")\n",
+    "\n",
+    "# Uinque mf terms\n",
+    "unique_mf_ids = mf['MF'].sort_values().unique()\n",
+    "\n",
+    "# Convert the NumPy array to a Pandas Series\n",
+    "uniq_mf_ids = pd.Series(unique_mf_ids)\n",
+    "\n",
+    "# create mf_dict \n",
+    "mf_map_dict = {value: key for key, value in uniq_mf_ids.to_dict().items()}\n",
+    "\n",
+    "# save mf_dict as json file\n",
+    "file_path = './mf_dict.json'\n",
+    "with open(file_path, 'w') as json_file:\n",
+    "    json.dump(mf_map_dict, json_file)\n",
+    "\n",
+    "\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "0b17b574-3449-47d1-8d09-76b7836fb5e4",
+   "metadata": {
+    "tags": []
+   },
+   "source": [
+    "#### (II) Creating MF-gene edge index:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "c5fff120-9181-4381-99e4-d6a88b899742",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Edge index mapping from gene_dict and mf_dict\n",
+    "mf[\"gene\"] = mf[\"gene\"].map(genes_dict)\n",
+    "mf[\"MF\"] = mf[\"MF\"].map(mf_map_dict)\n",
+    "mf = mf.dropna()\n",
+    "mf[\"gene\"] = mf[\"gene\"].astype(int)\n",
+    "edge_index = mf[[\"gene\", \"MF\"]].values.transpose()\n",
+    "\n",
+    "# save gene-mf edge index\n",
+    "np.save('/home/ahmed_kh/project/graph/genes/mf_gene_edge_index.npy', edge_index)\n",
+    "print(\"Done\", edge_index.shape) # [2 x num_edges]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "d1e3038a-b742-43b3-a02c-1ee549ca1cbf",
+   "metadata": {},
+   "source": [
+    "### (5) Biological processes\n",
+    "#### (I) Creating bp mapping-dictionary:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "bb6a57f4-95db-415e-8b8d-d449e45f0af7",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# read bp-gene edge file\n",
+    "bp = pd.read_csv(\"/home/ahmed_kh/project/raw_databases/drkg/bp_gene.csv\")\n",
+    "\n",
+    "# uinque bp terms\n",
+    "unique_bp_ids = bp['bp'].sort_values().unique()\n",
+    "\n",
+    "# Convert the NumPy array to a Pandas Series\n",
+    "uniq_bp_ids = pd.Series(unique_bp_ids)\n",
+    "\n",
+    "# create bp_dict \n",
+    "bp_map_dict = {value: key for key, value in uniq_bp_ids.to_dict().items()}\n",
+    "\n",
+    "# save bp_dict as json file\n",
+    "file_path = '/home/ahmed_kh/project/graph/genes/edge_index/mapping_dicts/bp_dict.json'\n",
+    "with open(file_path, 'w') as json_file:\n",
+    "    json.dump(bp_map_dict, json_file)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "60c31363-b9b2-4f9e-a076-fd90bbc1e02a",
+   "metadata": {
+    "tags": []
+   },
+   "source": [
+    "#### (II) Creating bp-gene edge index:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "edb83896-3f6d-4508-acac-6f95cc609d0f",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Edge index mapping from gene_dict and bp_dict\n",
+    "bp[\"gene\"] = bp[\"gene\"].map(genes_dict)\n",
+    "bp[\"bp\"] = bp[\"bp\"].map(bp_map_dict)\n",
+    "bp = bp.dropna()\n",
+    "bp[\"gene\"] = bp[\"gene\"].astype(int)\n",
+    "bp[\"bp\"] = bp[\"bp\"].astype(int)\n",
+    "edge_index = bp[[\"gene\", \"bp\"]].values.transpose()\n",
+    "\n",
+    "# save gene-mf edge index\n",
+    "np.save('/home/ahmed_kh/project/graph/genes/bp_gene_edge_index.npy', edge_index)\n",
+    "print(\"Done\", edge_index.shape) # [2 x num_edges]"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.10"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
