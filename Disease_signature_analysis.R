@@ -1,4 +1,5 @@
-# Here we will analyze the disease cohort dataset to obtain the disease signature. The dataset consists of 161 microarray samples (74 normal brain tissues and 86 Alzheimer's disease brain tissues).
+# Here we will analyze the disease cohort dataset to obtain the disease signature. 
+# The disease cohort is the "GSE5281" dataset from the NCBI-omnibus database consists of 161 microarray samples (74 normal brain tissues and 86 Alzheimer's disease brain tissues).
 # The analysis is conducted using the Geo2 pipeline with slite modifications in terms of the design matrix and the linear model used to fit the data
 # The differential gene expression was obtained in T-scores given that the signatures obtained from the camp were in Z-scores which are relatively similar metrics.
 ################################################################
