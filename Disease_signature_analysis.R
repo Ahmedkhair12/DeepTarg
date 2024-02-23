@@ -126,5 +126,5 @@ sig_merged <- sig %>%
 
 
 # save signature dataframe
-write.csv(sig_merged, file = "t_based_signature.csv")
+write.csv(sig_merged, file = "t_based_AD_signature.csv")
 
