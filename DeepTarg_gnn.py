@@ -1,10 +1,18 @@
 import pandas as pd
 import numpy as np
+
 import torch
-from torch import Tensor
-from torch_geometric.data import HeteroData
+import torch.nn.functional as F
 import torch_geometric.transforms as T
 import tqdm
+
+from torch import Tensor
+from torch_geometric.nn import GraphConv, to_hetero
+from torch_geometric.data import HeteroData
+from torch_geometric.data import HeteroData
+from torch_geometric.loader import LinkNeighborLoader
+
+
 
 
 
@@ -131,7 +139,7 @@ train_data, val_data, test_data = transform_2(data)
 
 
 
-from torch_geometric.loader import LinkNeighborLoader
+
 
 # Define seed edges:
 edge_label_index = train_data["perturbation", "trtxpr", "gene"].edge_label_index
@@ -157,12 +165,6 @@ sampled_data = next(iter(train_loader))
 
 
 
-
-from torch_geometric.nn import GraphConv, to_hetero
-import torch
-from torch import Tensor
-from torch_geometric.data import HeteroData
-import torch.nn.functional as F
 
 class GNN(torch.nn.Module):
     def __init__(self, hidden_channels):
