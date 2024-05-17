@@ -8,7 +8,7 @@ for ((i=1; i<=100; i++)); do
     python DeepTarg_gnn.py
 
     # Execute the second Python file
-    python deployment.py
+    python model_deployment.py
 
     echo "Iteration $i completed"
 done
