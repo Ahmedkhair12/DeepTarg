@@ -1,105 +1,101 @@
+
+from model_definition import Classifier
 import pandas as pd
 import numpy as np
-import torch
-from torch import Tensor
-from torch_geometric.data import HeteroData
-import torch_geometric.transforms as T
-import tqdm
 import json
-
-
-AD_therapeutic_node_feature = np.load('node_features/pca_synthetic_node_features.npy')
-print(AD_therapeutic_node_feature)
-
-placeholder_node_feature = np.zeros(512).astype(int)
-node_features = np.vstack((AD_therapeutic_node_feature, placeholder_node_feature))
-
-
-#Sythetic nodes
-
-nodes = ['AD_therapeutic', 'placeholder_node']
-
-# Step 2: Prepare HeteroData Object
-data_pred = HeteroData()
-
-data_pred["perturbation"].x = torch.tensor(node_features)
-data_pred["perturbation"].node_id = torch.arange(len(nodes))
-data_pred["gene"].node_id = torch.arange(len(genes))
-
-
-# Create a tensor with dimensions [2, 2440]
-edge_index = np.zeros((2, 18315 + 3), dtype=int)
-
-# Set the first half of the first row to ones
-edge_index[0, 18315:] = 1.0
-edge_index[1, 0:18315] = np.arange(0, 18315)
-edge_index[1,18315:] = np.arange(0, 3)
-
-
-transform = T.ToUndirected()
-data = transform(data_pred)
-
-
-data["perturbation", "trtxpr", "gene"].edge_label = torch.ones(18315 + 3)
+import torch
+import torch.nn.functional as F
 
 
 
-data = torch.load('hetero_data.pt')
+x_dict = torch.load('x_dict.pth')
+len(x_dict['perturbation'])
+
+node_features = np.zeros((2, 128), dtype=int)
+node_features
+
+therapeutic_node_embedding = x_dict["perturbation"][-1]
+therapeutic_node_embedding = torch.unsqueeze(therapeutic_node_embedding, 0)
+
+gene_embeddings =  x_dict["gene"]
+
+edge_index = np.zeros((2, 18315), dtype=int)
+#edge_index[0, -1] = 1.0
+edge_index[1,:] = np.arange(0, 18315)
+#edge_index[1,18315:] = np.arange(0, 3)
+edge_label_index = torch.tensor(edge_index)
 
 
-from xpr_uniq_DeepTarg import DeepTarg
-model = DeepTarg(data, hidden_channels=128)
-#Load the pre-trained model
-model.load_state_dict(torch.load('DeepTarg_trained_model.pth'))
-
-d_pred = HeteroData()
-
-d_pred["perturbation"].node_id = torch.arange(2)
-d_pred['perturbation'].x = torch.tensor(node_features) # [num_perturbation, num_features_perturbation]
-d_pred['perturbation', 'trtxpr', 'gene'].edge_index = torch.tensor(edge_index) # [2, num_edges]
-d_pred['perturbation', 'trtxpr', 'gene'].edge_label = torch.ones(18316)
-
-transform = T.ToUndirected()
-d_pred = transform(d_pred)
-d_pred
+classifier = Classifier()
+classifier.load_state_dict(torch.load('classifier_trained_model.pth'))
 
 
-data["perturbation"].node_id = d_pred["perturbation"].node_id
-data['perturbation'].x = d_pred['perturbation'].x # [num_perturbation, num_features_perturbation]
-data['perturbation', 'trtxpr', 'gene'].edge_index = d_pred['perturbation', 'trtxpr', 'gene'].edge_index # [2, num_edges]
-data['gene', 'rev_trtxpr', 'perturbation'].edge_index = d_pred['gene', 'rev_trtxpr', 'perturbation'].edge_index 
-data['perturbation', 'trtxpr', 'gene'].edge_label = torch.ones(18318)
-data['perturbation', 'trtxpr', 'gene'].edge_label_index = torch.tensor(edge_index)
-
-
-
-# Forward pass with the trained model
+classifier.eval()
 with torch.no_grad():
-    model.eval()
-    predictions = model(data)
-    pred = predictions #[:610]
-#threshold = 0.9
-#filtered_links = predictions > threshold
+    dot_products = classifier(therapeutic_node_embedding, gene_embeddings, edge_label_index)
 
-# Print or use the filtered links as needed
-#print(predictions[filtered_links])
-# You can use predictions for further analysis
-print(len(pred))
-#print(len(predictions[filtered_links]))
+dot_products = dot_products.to('cpu')
+
+edge_labels = torch.tensor(np.ones(18315))
 
 
-#threshold = -70
-#filtered_links = pred > threshold
+edge_losses = []
+for i in range(len(edge_labels)):
+    edge_label = edge_labels[i]
+    dot_product = dot_products[i]
+    edge_loss = F.binary_cross_entropy_with_logits(dot_product, edge_label)
+    edge_losses.append(float(edge_loss))
+edge_losses = torch.tensor(edge_losses)
 
-# Print or use the filtered links as needed
-#print(pred[filtered_links])
+
+predicted_edge_scores = 1 - edge_losses
 
 
-probabilistic_output = torch.sigmoid(pred)
 
-k = 10
-# Use torch.topk to get the indices and values of the k largest elements
-top_values, top_indices = torch.topk(probabilistic_output, k)
-print("top_value_indeces:", top_values, top_indices)
+k = 20
+# Use torch.topk to get the indices and values of the k smallest elements
+top_edge_scores, top_indices = torch.topk(predicted_edge_scores, k)
+top_edge_scores = top_edge_scores.tolist()
+top_indices = top_indices.tolist()
+    
 
-print("pred:", pred)
+# gene_mapping_dictionary from json file, consider datatypes in the dictionary!
+
+file_path = 'mapping_dicts/genes_dict.json'
+with open(file_path, 'r') as json_file:
+    genes_dict_json = json.load(json_file)
+
+#convert back strings into integers as they got mutated in json conversion! 
+    genes_dict = {value: int(key) for key, value in genes_dict_json.items()}
+    
+gene_names = pd.read_table("gene_names.txt")
+gene_names = gene_names.dropna()
+gene_names["entrezId"] = gene_names["entrezId"].astype("int")
+gene_names = gene_names.set_index("entrezId")
+
+
+
+gene_ids = []
+gene_symbols =[]
+scores = []
+for i in range(len(top_indices)):
+    gene_id = genes_dict[top_indices[i]]
+    gene_ids.append(gene_id)
+    score = round(top_edge_scores[i], 3)
+    scores.append(score)
+    if gene_id in gene_names["geneSymbol"]:
+        gene_symbol = gene_names.loc[gene_id, "geneSymbol"]
+    else:
+        gene_symbol = "missing"
+    gene_symbols.append(gene_symbol)
+
+
+
+# Open the file in append mode
+with open('conv_output.txt', 'a') as file:
+    # Append output to the file
+    for i in range(len(gene_ids)):
+        line = f"{str(gene_ids[i])},{str(gene_symbols[i])},{str(scores[i])}"
+        line += "\n"
+        file.write(line)
+
