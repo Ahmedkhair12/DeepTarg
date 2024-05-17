@@ -16,9 +16,6 @@ perturbations = torch.from_numpy(perturbations)
 genes = np.load('node_features/gene_node_feature_matrix.npy')
 genes = torch.from_numpy(genes)
 
-#mirna = np.load('node_features/mirna_node_feature_matrix.npy')
-#mirna = torch.from_numpy(mirna)
-
 tissue = np.load('node_features/tissue_node_feature_matrix.npy')
 tissue = torch.from_numpy(tissue)
 
@@ -34,7 +31,7 @@ bp = torch.from_numpy(bp)
 
 
 
-# Load edge indeces
+# Load edge indices
 
 perturbation_trtxpr_gene = torch.from_numpy(np.load('edge_index/xpr_uniq_genes_edge_index.npy'))
 
@@ -48,7 +45,6 @@ gene_expression_gene = torch.from_numpy(np.load('edge_index/edge_index_expressio
 gene_ptmod_gene = torch.from_numpy(np.load('edge_index/edge_index_ptmod.npy'))
 gene_other_gene = torch.from_numpy(np.load('edge_index/edge_index_other.npy'))
 
-#gene_influenced_by_mirna = torch.from_numpy(np.load('edge_index/mirna_edge_index.npy'))
 
 
 gene_expressed_in_tissue = torch.from_numpy(np.load('edge_index/gene_expressed_tissue_edge_index.npy'))
@@ -93,7 +89,6 @@ data['gene', 'expressed_with', 'gene'].edge_index = gene_expression_gene # [2, n
 data['gene', 'ptmod', 'gene'].edge_index = gene_ptmod_gene # [2, num_edges]
 data['gene', 'other', 'gene'].edge_index = gene_other_gene # [2, num_edges]
 
-#data['gene', 'influenced_by', 'mirna'].edge_index = gene_influenced_by_mirna # [2, num_edges]
 
 data['gene', 'expressed_in', 'tissue'].edge_index = gene_expressed_in_tissue # [2, num_edges]
 data['gene', 'upregulated_in', 'tissue'].edge_index = gene_upregulated_in_tissue # [2, num_edges]
@@ -117,9 +112,9 @@ data = data.to(device)
 
 
 
-# split the set of edges into training (80%), validation (10%), and testing edges (10%).
-# we use 70% of the training edges for message passing and 30% of the edges for supervision.
-# We further want to generate negative edges for evaluation with a ratio of 2:1.
+# Split the set of edges into training (80%), validation (10%), and testing edges (10%).
+# Use 70% of the training edges for message passing and 30% of the edges for supervision.
+# Generate negative edges for evaluation with a ratio of 2:1.
 
 transform_2 = T.RandomLinkSplit(
     num_val = int(0.1 * 5527),  
@@ -131,7 +126,7 @@ transform_2 = T.RandomLinkSplit(
     rev_edge_types = ("gene", "rev_trtxpr", "perturbation")
 )
 
-#transform = T.RandomLinkSplit(is_undirected=True)
+
 train_data, val_data, test_data = transform_2(data)
 
 
