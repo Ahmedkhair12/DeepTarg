@@ -71,17 +71,10 @@ data = HeteroData()
 data['perturbation'].x = perturbations # [num_perturbation, num_features_perturbation]
 data["perturbation"].x = data["perturbation"].x.float()
 
-#data['gene'].x = genes # [num_gene, num_features_gene]
-#data['mirna'].x = mirna
-#data['tissue'].x = tissue # [num_tissue, num_features_tissue]
-#data['pw'].x = pw # [num_pw, num_features_pw]
-#data['mf'].x = mf # [num_mf, num_features_mf]
-#data['bp'].x = bp # [num_bp, num_features_bp]
 
 
 data["perturbation"].node_id = torch.arange(len(data['perturbation'].x))
 data["gene"].node_id = torch.arange(len(genes))
-#data["mirna"].node_id = torch.arange(len(data['mirna'].x))
 data["tissue"].node_id = torch.arange(len(tissue))
 data["pw"].node_id = torch.arange(len(pw))
 data["mf"].node_id = torch.arange(len(mf))
@@ -114,8 +107,6 @@ data['gene', 'participates_in', 'bp'].edge_index = gene_in_bp # [2, num_edges]
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-#
-#print(f"Device: '{device}'")
 
 
 transform = T.ToUndirected()
@@ -127,11 +118,9 @@ data = data.to(device)
 
 
 # split the set of edges into training (80%), validation (10%), and testing edges (10%).
-# we use 70% of the training edges for message passing, and 30% of edges for supervision.
-# We further want to generate fixed negative edges for evaluation with a ratio of 2:1.
-# Negative edges during training will be generated on-the-fly, so we don't want to
-# add them to the graph right away.
-# Overall, we can leverage the `RandomLinkSplit()` transform for this from PyG:
+# we use 70% of the training edges for message passing and 30% of the edges for supervision.
+# We further want to generate negative edges for evaluation with a ratio of 2:1.
+
 transform_2 = T.RandomLinkSplit(
     num_val = int(0.1 * 5527),  
     num_test = int(0.1 * 5527), 
@@ -146,26 +135,8 @@ transform_2 = T.RandomLinkSplit(
 train_data, val_data, test_data = transform_2(data)
 
 
-#print("Training data:")
-#print("==============")
-#print(train_data)
-#print()
-#print("test data:")
-#print("================")
-#print(test_data)
-#print("Validation data:")
-#print("================")
-#print(val_data)
 
-
-
-# In the first hop, we sample at most 20 neighbors.
-# In the second hop, we sample at most 10 neighbors.
-# In addition, during training, we want to sample negative edges on-the-fly with
-# a ratio of 2:1.
-# We can make use of the `loader.LinkNeighborLoader` from PyG:
 from torch_geometric.loader import LinkNeighborLoader
-
 
 # Define seed edges:
 edge_label_index = train_data["perturbation", "trtxpr", "gene"].edge_label_index
@@ -213,7 +184,6 @@ class GNN(torch.nn.Module):
      
 
         
-
 # Our final classifier applies the dot-product between source and destination
 # node embeddings to derive edge-level predictions:
 class Classifier(torch.nn.Module):
@@ -226,10 +196,7 @@ class Classifier(torch.nn.Module):
         return (edge_feat_perturbation * edge_feat_gene).sum(dim=-1)
 
     
-    
-#data.edge_index_dict
-
-
+# model assembly 
 class DeepTarg(torch.nn.Module):
     def __init__(self, data, hidden_channels):
         super().__init__()
@@ -260,11 +227,6 @@ class DeepTarg(torch.nn.Module):
                   "mf": self.mf_emb(self.data["mf"].node_id), 
                   "bp": self.bp_emb(self.data["bp"].node_id)}
                     
-
-
-        #edges = [('perturbation','trtxpr','gene'), ('gene','rev_trtxpr','perturbation')]
-        #edge_index_dict = {key: data.edge_index_dict[key] for key in edges}
-        #print("edge_index_dictttttttt:", edge_index_dict[('perturbation','trtxpr','gene')].dtype)
         
         x_dict = self.gnn(x_dict, data.edge_index_dict)
         classifier_state_dict = self.classifier.state_dict()
@@ -293,7 +255,6 @@ model = model.to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 
-#DeepTarg_state_dict = {}
 gnn_state_dict = {}
 classifier_state_dict = {}
 x_dict = {}
@@ -311,8 +272,7 @@ for epoch in range(1, 25):
         
         # Ground truth can be obtained from the sampled_data
         ground_truth = sampled_data["perturbation", "trtxpr", "gene"].edge_label.view(-1, 1).float()[:,0]
-        #print('ground_truth', ground_truth)
-        #print('pred', pred)
+   
         # Apply binary cross entropy
         loss = F.binary_cross_entropy_with_logits(pred, ground_truth)
 
@@ -354,13 +314,10 @@ val_loader = LinkNeighborLoader(
 
 sampled_data = next(iter(val_loader))
 
-#print("Sampled mini-batch:")
-#print("===================")
-#print(sampled_data)
 
 
 
-
+# model evaluation
 from sklearn.metrics import roc_auc_score
 
 
