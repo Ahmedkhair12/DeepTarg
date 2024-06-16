@@ -1,2 +1,2 @@
 # DeepTarg
-A Graph Neural Network Framework for Therapeutic Target Discovery
+A Graph Neural Network Framework for Target-Based Drug Discovery
